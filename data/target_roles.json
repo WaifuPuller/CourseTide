@@ -1,0 +1,62 @@
+{
+  "ml_engineer": {
+    "name": "Machine Learning Engineer",
+    "domain": "ml",
+    "required_skills": [
+      "python",
+      "git",
+      "stats",
+      "data_manip",
+      "ml_fund",
+      "feat_eng",
+      "deep_learning",
+      "neural_nets",
+      "mlops"
+    ],
+    "recommended_optional_skills": [
+      "computer_vision",
+      "nlp",
+      "sql",
+      "dataviz"
+    ],
+    "default_timeframe_months": 6,
+    "default_weekly_hours": 8
+  },
+  "data_scientist": {
+    "name": "Data Scientist",
+    "domain": "ml",
+    "required_skills": [
+      "python",
+      "stats",
+      "data_manip",
+      "dataviz",
+      "ml_fund",
+      "feat_eng",
+      "sql"
+    ],
+    "recommended_optional_skills": [
+      "deep_learning",
+      "nlp"
+    ],
+    "default_timeframe_months": 5,
+    "default_weekly_hours": 7
+  },
+  "mlops_engineer": {
+    "name": "MLOps Engineer",
+    "domain": "ml",
+    "required_skills": [
+      "python",
+      "git",
+      "ml_fund",
+      "deep_learning",
+      "mlops"
+    ],
+    "recommended_optional_skills": [
+      "sql",
+      "rest_api",
+      "deploy_devops"
+    ],
+    "default_timeframe_months": 5,
+    "default_weekly_hours": 8
+  }
+}

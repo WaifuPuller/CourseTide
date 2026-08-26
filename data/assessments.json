@@ -1,0 +1,92 @@
+[
+  {
+    "id": "assessment-python-basics",
+    "title": "Python Foundations Check",
+    "skill_id": "python",
+    "difficulty": "beginner",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-data-manipulation",
+    "title": "Data Manipulation Check",
+    "skill_id": "data_manip",
+    "difficulty": "beginner",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-statistics",
+    "title": "Statistics & Probability Check",
+    "skill_id": "stats",
+    "difficulty": "beginner",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-ml-fundamentals",
+    "title": "Machine Learning Foundations Check",
+    "skill_id": "ml_fund",
+    "difficulty": "intermediate",
+    "question_count": 12,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-feature-engineering",
+    "title": "Feature Engineering Check",
+    "skill_id": "feat_eng",
+    "difficulty": "intermediate",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-deep-learning",
+    "title": "Deep Learning Check",
+    "skill_id": "deep_learning",
+    "difficulty": "advanced",
+    "question_count": 12,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-neural-networks",
+    "title": "Neural Networks Check",
+    "skill_id": "neural_nets",
+    "difficulty": "advanced",
+    "question_count": 12,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-mlops",
+    "title": "MLOps Readiness Check",
+    "skill_id": "mlops",
+    "difficulty": "advanced",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-deployment",
+    "title": "Deployment Foundations Check",
+    "skill_id": "deploy_devops",
+    "difficulty": "beginner",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  },
+  {
+    "id": "assessment-sql",
+    "title": "SQL Foundations Check",
+    "skill_id": "sql",
+    "difficulty": "beginner",
+    "question_count": 10,
+    "pass_score": 70,
+    "mastery_score": 85
+  }
+]

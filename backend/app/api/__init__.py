@@ -1,0 +1,1 @@
+"""CourseTide API router package."""

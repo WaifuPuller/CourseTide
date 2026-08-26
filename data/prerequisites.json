@@ -1,0 +1,62 @@
+{
+  "python": [],
+  "git": [],
+  "sql": [],
+  "stats": [],
+  "data_manip": [
+    "python"
+  ],
+  "dataviz": [
+    "data_manip"
+  ],
+  "ml_fund": [
+    "python",
+    "stats",
+    "data_manip"
+  ],
+  "feat_eng": [
+    "ml_fund"
+  ],
+  "deep_learning": [
+    "ml_fund"
+  ],
+  "neural_nets": [
+    "deep_learning"
+  ],
+  "computer_vision": [
+    "neural_nets"
+  ],
+  "nlp": [
+    "neural_nets"
+  ],
+  "mlops": [
+    "deep_learning",
+    "git"
+  ],
+  "html_css": [],
+  "js_fund": [
+    "html_css"
+  ],
+  "react": [
+    "js_fund"
+  ],
+  "node_express": [
+    "js_fund"
+  ],
+  "rest_api": [
+    "node_express"
+  ],
+  "db_web": [
+    "rest_api"
+  ],
+  "auth_security": [
+    "rest_api"
+  ],
+  "nextjs": [
+    "react"
+  ],
+  "deploy_devops": [
+    "rest_api",
+    "git"
+  ]
+}

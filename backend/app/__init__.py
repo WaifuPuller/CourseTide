@@ -1,0 +1,1 @@
+"""CourseTide backend application package."""

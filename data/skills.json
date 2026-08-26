@@ -1,0 +1,134 @@
+[
+  {
+    "id": "python",
+    "name": "Python Programming",
+    "domain": "ml",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "git",
+    "name": "Git & Version Control",
+    "domain": "general",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "data_manip",
+    "name": "Data Manipulation (Pandas/NumPy)",
+    "domain": "ml",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "sql",
+    "name": "SQL & Databases",
+    "domain": "ml",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "stats",
+    "name": "Statistics & Probability",
+    "domain": "ml",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "dataviz",
+    "name": "Data Visualization",
+    "domain": "ml",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "ml_fund",
+    "name": "Machine Learning Fundamentals",
+    "domain": "ml",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "feat_eng",
+    "name": "Feature Engineering",
+    "domain": "ml",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "deep_learning",
+    "name": "Deep Learning",
+    "domain": "ml",
+    "recommended_entry_level": "advanced"
+  },
+  {
+    "id": "neural_nets",
+    "name": "Neural Network Architectures",
+    "domain": "ml",
+    "recommended_entry_level": "advanced"
+  },
+  {
+    "id": "computer_vision",
+    "name": "Computer Vision",
+    "domain": "ml",
+    "recommended_entry_level": "advanced"
+  },
+  {
+    "id": "nlp",
+    "name": "Natural Language Processing",
+    "domain": "ml",
+    "recommended_entry_level": "advanced"
+  },
+  {
+    "id": "mlops",
+    "name": "Model Deployment & MLOps",
+    "domain": "ml",
+    "recommended_entry_level": "advanced"
+  },
+  {
+    "id": "html_css",
+    "name": "HTML & CSS",
+    "domain": "web",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "js_fund",
+    "name": "JavaScript Fundamentals",
+    "domain": "web",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "react",
+    "name": "React.js",
+    "domain": "web",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "node_express",
+    "name": "Node.js & Express",
+    "domain": "web",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "rest_api",
+    "name": "REST API Design",
+    "domain": "web",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "db_web",
+    "name": "Databases for Web Apps",
+    "domain": "web",
+    "recommended_entry_level": "beginner"
+  },
+  {
+    "id": "auth_security",
+    "name": "Authentication & Security Basics",
+    "domain": "web",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "nextjs",
+    "name": "Next.js",
+    "domain": "web",
+    "recommended_entry_level": "intermediate"
+  },
+  {
+    "id": "deploy_devops",
+    "name": "Deployment & DevOps Basics",
+    "domain": "web",
+    "recommended_entry_level": "beginner"
+  }
+]

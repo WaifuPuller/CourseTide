@@ -1,0 +1,14 @@
+{
+  "course_count": 48,
+  "mvp_count": 32,
+  "web_count": 16,
+  "skill_count": 22,
+  "assessment_count": 10,
+  "course_skills_count": 74,
+  "invalid_skill_references": [],
+  "unknown_prerequisite_skill_references": [],
+  "missing_metadata_titles": [],
+  "multi_skill_course_count": 24,
+  "validation_status": "PASS",
+  "note": "Counts corrected after removing an incorrect 'mlops' secondary skill tag from docker-for-beginners (a beginner course should not require deep_learning as an upstream prerequisite). Original pre-fix counts were course_skills_count=75, multi_skill_course_count=25."
+}
