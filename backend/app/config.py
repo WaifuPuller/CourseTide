@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     # Project Directories
     DATA_DIRECTORY: Path = DATA_DIR
 
+    @field_validator("BACKEND_PORT", mode="before")
+    @classmethod
+    def assemble_backend_port(cls, v: Union[str, int, None]) -> int:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return 8000
+        return int(v)
+
     @field_validator("CORS_ORIGINS", mode="after")
     @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
