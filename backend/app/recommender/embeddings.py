@@ -17,15 +17,54 @@ from sqlalchemy.orm import joinedload
 from backend.app.config import DATA_DIR, settings
 from backend.app.models import Course, CourseSkill, Skill
 
+def _load_skill_embeddings() -> Dict[str, np.ndarray]:
+    emb_file = DATA_DIR / "skill_embeddings.json"
+    if emb_file.exists():
+        with open(emb_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return {k: np.array(v, dtype=np.float32) for k, v in data.items()}
+    return {}
+
+
+SKILL_EMBEDDINGS = _load_skill_embeddings()
+
+
+class PrecomputedSkillEmbedder:
+    """Fast, zero-PyTorch embedding encoder using precomputed skill embeddings."""
+
+    def encode(self, texts: Sequence[str], normalize_embeddings: bool = True, **kwargs):
+        results = []
+        for text in texts:
+            vecs = [
+                v for k, v in SKILL_EMBEDDINGS.items()
+                if k in text or SKILLS_MAP.get(k, "").lower() in text.lower()
+            ]
+            if vecs:
+                mean_vec = np.mean(vecs, axis=0)
+                if normalize_embeddings:
+                    norm = np.linalg.norm(mean_vec)
+                    if norm > 0:
+                        mean_vec = mean_vec / norm
+                results.append(mean_vec)
+            else:
+                fallback = np.zeros(384, dtype=np.float32)
+                fallback[0] = 1.0
+                results.append(fallback)
+        return np.array(results)
+
+
 _GLOBAL_EMBED_MODEL = None
 
 
 def get_embed_model():
-    """Retrieve or initialize the SentenceTransformer embedding model singleton."""
+    """Retrieve or initialize embedding model singleton (falls back to precomputed skill embedder)."""
     global _GLOBAL_EMBED_MODEL
     if _GLOBAL_EMBED_MODEL is None and not settings.TESTING:
-        from sentence_transformers import SentenceTransformer
-        _GLOBAL_EMBED_MODEL = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
+        try:
+            from sentence_transformers import SentenceTransformer
+            _GLOBAL_EMBED_MODEL = SentenceTransformer(settings.EMBEDDING_MODEL_NAME)
+        except (ImportError, Exception):
+            _GLOBAL_EMBED_MODEL = PrecomputedSkillEmbedder()
     return _GLOBAL_EMBED_MODEL
 
 
