@@ -12,6 +12,56 @@ export interface ProfileInput {
   weekly_hours?: number;
 }
 
+export interface RecommendedCourse {
+  id: string;
+  title: string;
+  description?: string;
+  difficulty: string;
+  duration_hours: number;
+  resource_type: string;
+  domain: string;
+  source?: string;
+  url?: string;
+  learning_outcomes?: string;
+  primary_skill?: string;
+  all_skills: string[];
+  covered_gap_skills: string[];
+  match_score: number;
+  semantic_similarity: number;
+  gap_coverage_ratio: number;
+}
+
+export interface ProfileResponse {
+  learner_id: string;
+  name?: string;
+  email?: string;
+  goal: string;
+  target_role: string;
+  role_name: string;
+  weekly_hours: number;
+  timeframe_months: number;
+  known_skills: string[];
+  gap_skills: string[];
+  unrecognized_skills: string[];
+  match_percentage: number;
+  recommended_courses: RecommendedCourse[];
+  parsed_goal?: Record<string, any>;
+}
+
+export interface SkillGapResponse {
+  learner_id: string;
+  target_role: string;
+  role_name: string;
+  required_skills: string[];
+  known_skills: string[];
+  gap_skills: string[];
+  recommended_optional_skills: string[];
+  total_required_count: number;
+  known_count: number;
+  gap_count: number;
+  match_percentage: number;
+}
+
 export interface ProgressEventInput {
   learner_id: string;
   course_id: string;
@@ -30,8 +80,14 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`API Request Error [${response.status}] ${response.statusText}: ${errorBody}`);
+    let errorDetail = response.statusText;
+    try {
+      const errorBody = await response.json();
+      errorDetail = errorBody.detail || JSON.stringify(errorBody);
+    } catch {
+      errorDetail = await response.text();
+    }
+    throw new Error(errorDetail);
   }
 
   return response.json();
@@ -43,14 +99,14 @@ export const api = {
 
   // Profile Intake (POST /api/profile)
   createProfile: (data: ProfileInput) =>
-    request<any>("/api/profile", {
+    request<ProfileResponse>("/api/profile", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   // Skill Gap (GET /api/skill-gap/{learner_id})
   getSkillGap: (learnerId: string) =>
-    request<any>(`/api/skill-gap/${learnerId}`),
+    request<SkillGapResponse>(`/api/skill-gap/${learnerId}`),
 
   // Roadmap (GET /api/roadmap/{learner_id})
   getRoadmap: (learnerId: string) =>
