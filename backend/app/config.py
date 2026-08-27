@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     # AI Configuration
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    LLM_PROVIDER: str = "gemini"
+    LLM_MODEL_NAME: str = "gemini-3.7-flash"
     EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    TESTING: bool = False
 
     # Server Configuration
     BACKEND_HOST: str = "0.0.0.0"

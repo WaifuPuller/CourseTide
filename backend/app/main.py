@@ -14,9 +14,19 @@ from backend.app.config import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup tasks
+    # Startup tasks: Initialize embedding model singleton once
+    if not settings.TESTING:
+        from backend.app.recommender.embeddings import get_embed_model
+        try:
+            app.state.embed_model = get_embed_model()
+        except Exception as e:
+            print(f"[!] Fatal: Failed to initialize embedding model on startup: {e}")
+            raise
+    else:
+        app.state.embed_model = None
     yield
     # Shutdown tasks
+
 
 
 app = FastAPI(
