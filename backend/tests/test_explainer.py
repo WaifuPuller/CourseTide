@@ -171,7 +171,7 @@ def test_primary_model_success():
         with unittest.mock.patch("httpx.AsyncClient.post", return_value=mock_resp) as mock_post:
             res = await generate_explanation_async(
                 ctx,
-                model_chain=["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
+                model_chain=["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"],
                 api_key="mock_key",
             )
 
@@ -219,14 +219,14 @@ def test_primary_retryable_failure_triggers_fallback_1():
         with unittest.mock.patch("httpx.AsyncClient.post", side_effect=[primary_fail, fallback_success]) as mock_post:
             res = await generate_explanation_async(
                 ctx,
-                model_chain=["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
+                model_chain=["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"],
                 api_key="mock_key",
             )
 
             assert res == "Fallback 1 model explanation."
             assert mock_post.call_count == 2
             assert "gemini-3.7-flash" in str(mock_post.call_args_list[0][0][0])
-            assert "gemini-2.5-flash" in str(mock_post.call_args_list[1][0][0])
+            assert "gemini-3.6-flash" in str(mock_post.call_args_list[1][0][0])
 
     run_sync(_test())
 
@@ -264,13 +264,13 @@ def test_primary_and_fallback_1_fail_triggers_fallback_2():
         with unittest.mock.patch("httpx.AsyncClient.post", side_effect=[fail_1, fail_2, success_3]) as mock_post:
             res = await generate_explanation_async(
                 ctx,
-                model_chain=["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
+                model_chain=["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"],
                 api_key="mock_key",
             )
 
             assert res == "Fallback 2 model explanation."
             assert mock_post.call_count == 3
-            assert "gemini-2.0-flash" in str(mock_post.call_args_list[2][0][0])
+            assert "gemini-3.5-flash" in str(mock_post.call_args_list[2][0][0])
 
     run_sync(_test())
 
@@ -301,7 +301,7 @@ def test_malformed_json_triggers_next_model_fallback():
         with unittest.mock.patch("httpx.AsyncClient.post", side_effect=[malformed_resp, valid_fallback]) as mock_post:
             res = await generate_explanation_async(
                 ctx,
-                model_chain=["gemini-3.7-flash", "gemini-2.5-flash"],
+                model_chain=["gemini-3.7-flash", "gemini-3.6-flash"],
                 api_key="mock_key",
             )
 
@@ -331,7 +331,7 @@ def test_all_models_fail_raises_explanation_unavailable_error():
             with pytest.raises(ExplanationUnavailableError) as exc_info:
                 await generate_explanation_async(
                     ctx,
-                    model_chain=["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
+                    model_chain=["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"],
                     api_key="mock_key",
                 )
 
@@ -364,7 +364,7 @@ def test_non_retryable_error_fails_immediately_without_cascading():
             with pytest.raises(ExplanationError) as exc_info:
                 await generate_explanation_async(
                     ctx,
-                    model_chain=["gemini-3.7-flash", "gemini-2.5-flash", "gemini-2.0-flash"],
+                    model_chain=["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash"],
                     api_key="mock_key",
                 )
 
@@ -403,7 +403,7 @@ def test_identical_context_sent_to_all_attempted_models():
         with unittest.mock.patch("httpx.AsyncClient.post", side_effect=[fail_1, success_2]) as mock_post:
             await generate_explanation_async(
                 ctx,
-                model_chain=["gemini-3.7-flash", "gemini-2.5-flash"],
+                model_chain=["gemini-3.7-flash", "gemini-3.6-flash"],
                 api_key="mock_key",
             )
 

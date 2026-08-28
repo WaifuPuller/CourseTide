@@ -195,7 +195,7 @@ def test_mocked_gemini_response_parsing():
 
 
 def test_gemini_fallback_primary_503_cascades_to_fallback1():
-    """Verify that a 503 on primary model falls back to gemini-2.5-flash and succeeds."""
+    """Verify that a 503 on primary model falls back to gemini-3.6-flash and succeeds."""
     mock_success_json = {
         "candidates": [
             {
@@ -228,7 +228,7 @@ def test_gemini_fallback_primary_503_cascades_to_fallback1():
             assert mock_post.call_count == 2
             urls = [call.args[0] for call in mock_post.call_args_list]
             assert "gemini-3.7-flash" in urls[0]
-            assert "gemini-2.5-flash" in urls[1]
+            assert "gemini-3.6-flash" in urls[1]
 
 
 def test_gemini_fallback_429_cascades_to_fallback1():
@@ -261,7 +261,7 @@ def test_gemini_fallback_429_cascades_to_fallback1():
             assert parsed.target_role == "data_scientist"
             assert mock_post.call_count == 2
             assert "gemini-3.7-flash" in mock_post.call_args_list[0].args[0]
-            assert "gemini-2.5-flash" in mock_post.call_args_list[1].args[0]
+            assert "gemini-3.6-flash" in mock_post.call_args_list[1].args[0]
 
 
 def test_gemini_fallback_primary_and_fallback1_fail_cascades_to_fallback2():
@@ -299,8 +299,8 @@ def test_gemini_fallback_primary_and_fallback1_fail_cascades_to_fallback2():
             assert mock_post.call_count == 3
             urls = [call.args[0] for call in mock_post.call_args_list]
             assert "gemini-3.7-flash" in urls[0]
-            assert "gemini-2.5-flash" in urls[1]
-            assert "gemini-2.0-flash" in urls[2]
+            assert "gemini-3.6-flash" in urls[1]
+            assert "gemini-3.5-flash" in urls[2]
 
 
 def test_gemini_fallback_all_models_exhausted_raises_503():
@@ -315,7 +315,7 @@ def test_gemini_fallback_all_models_exhausted_raises_503():
                 parse_goal("I want to become an ML engineer", provider="gemini")
             assert exc.value.status_code == 503
             assert "temporarily unavailable" in str(exc.value)
-            assert mock_post.call_count == 3  # 3.7-flash, 2.5-flash, 2.0-flash
+            assert mock_post.call_count == 3  # 3.7-flash, 3.6-flash, 3.5-flash
 
 
 def test_gemini_non_retryable_400_fails_fast():
@@ -411,5 +411,5 @@ def test_gemini_fallback_malformed_json_cascades_to_fallback1():
             assert mock_post.call_count == 2
             urls = [call.args[0] for call in mock_post.call_args_list]
             assert "gemini-3.7-flash" in urls[0]
-            assert "gemini-2.5-flash" in urls[1]
+            assert "gemini-3.6-flash" in urls[1]
 

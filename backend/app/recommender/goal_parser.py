@@ -377,8 +377,8 @@ class GeminiGoalParser:
 
         chain = model_chain if model_chain is not None else [
             model_name or settings.LLM_MODEL_NAME or "gemini-3.7-flash",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash",
         ]
         ordered_models = list(dict.fromkeys(chain))
 

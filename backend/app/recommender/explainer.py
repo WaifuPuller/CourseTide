@@ -115,8 +115,8 @@ Return ONLY a valid JSON object matching this schema:
 
 DEFAULT_MODEL_CHAIN: List[str] = [
     "gemini-3.7-flash",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
 ]
 
 
@@ -143,8 +143,8 @@ async def generate_explanation_async(
     # Determine ordered list of models
     chain = model_chain if model_chain is not None else [
         settings.LLM_MODEL_NAME or "gemini-3.7-flash",
-        "gemini-2.5-flash",
-        "gemini-2.0-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
     ]
     # Preserve order and eliminate duplicates
     ordered_models = list(dict.fromkeys(chain))
