@@ -63,6 +63,50 @@ export interface SkillGapResponse {
   match_percentage: number;
 }
 
+export interface RoadmapCourse {
+  course_id: string;
+  title: string;
+  difficulty: string;
+  duration_hours: number;
+  domain: string;
+  source?: string;
+  url?: string;
+  primary_skill?: string;
+  covered_skills: string[];
+  phase_number: number;
+  sequence_order: number;
+  status: "available" | "locked" | "in_progress" | "done" | string;
+  match_score?: number;
+}
+
+export interface RoadmapPhase {
+  phase_number: number;
+  phase_name: string;
+  skills: string[];
+  courses: RoadmapCourse[];
+  estimated_hours: number;
+}
+
+export interface RoadmapResponse {
+  learner_id: string;
+  target_role: string;
+  role_name: string;
+  total_courses: number;
+  total_estimated_hours: number;
+  total_estimated_weeks: number;
+  phases: RoadmapPhase[];
+}
+
+export interface ExplanationResponse {
+  learner_id: string;
+  course_id: string;
+  course_title: string;
+  primary_skill: string;
+  phase_number: number;
+  phase_name: string;
+  explanation: string;
+}
+
 export interface ProgressEventInput {
   learner_id: string;
   course_id: string;
@@ -111,11 +155,11 @@ export const api = {
 
   // Roadmap (GET /api/roadmap/{learner_id})
   getRoadmap: (learnerId: string) =>
-    request<any>(`/api/roadmap/${learnerId}`),
+    request<RoadmapResponse>(`/api/roadmap/${learnerId}`),
 
   // Grounded Explanation (GET /api/explain/{learner_id}/{course_id})
   getExplanation: (learnerId: string, courseId: string) =>
-    request<any>(`/api/explain/${learnerId}/${courseId}`),
+    request<ExplanationResponse>(`/api/explain/${learnerId}/${courseId}`),
 
   // Adaptive Progress (POST /api/progress)
   recordProgress: (data: ProgressEventInput) =>
