@@ -342,51 +342,110 @@ class MockGoalParser:
         }
 
 
-# ---------------------------------------------------------------------------
-# GEMINI PROVIDER (OFFICIAL GOOGLE GENAI CLIENT)
-# ---------------------------------------------------------------------------
+RETRYABLE_GEMINI_STATUS_CODES = {429, 500, 502, 503, 504}
+
+
+def is_retryable_gemini_error(status_code: int, error_text: str = "") -> bool:
+    """Determines if a Gemini API HTTP error or response indicates a retryable availability condition."""
+    if status_code in RETRYABLE_GEMINI_STATUS_CODES:
+        return True
+    err_lower = error_text.lower()
+    retryable_indicators = [
+        "rate limit", "quota", "resource exhausted", "overloaded",
+        "service unavailable", "model unavailable", "try again",
+        "temporarily unavailable", "deadline exceeded", "high demand",
+    ]
+    return any(ind in err_lower for ind in retryable_indicators)
+
 
 class GeminiGoalParser:
-    """Google Gemini Goal Parser using current Google GenAI API client."""
+    """Google Gemini Goal Parser using current Google GenAI API client with model fallback chain."""
 
     @staticmethod
-    def parse(goal_text: str, model_name: str, api_key: str) -> Dict[str, Any]:
-        if not api_key:
+    def parse(
+        goal_text: str,
+        model_name: Optional[str] = None,
+        api_key: Optional[str] = None,
+        model_chain: Optional[List[str]] = None,
+        timeout_seconds: float = 15.0,
+    ) -> Dict[str, Any]:
+        key = api_key or settings.GEMINI_API_KEY
+        if not key:
             raise LLMConfigurationError("Gemini API key is not configured in .env (GEMINI_API_KEY is empty).")
 
         import httpx
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        headers = {"Content-Type": "application/json"}
-        payload = {
-            "systemInstruction": {
-                "parts": [{"text": _build_system_prompt()}]
-            },
-            "contents": [
-                {
-                    "parts": [{"text": f"Learner goal:\n{goal_text}"}]
-                }
-            ],
-            "generationConfig": {
-                "responseMimeType": "application/json",
-                "thinkingConfig": {
-                    "thinkingLevel": "low",
+        chain = model_chain if model_chain is not None else [
+            model_name or settings.LLM_MODEL_NAME or "gemini-3.7-flash",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+        ]
+        ordered_models = list(dict.fromkeys(chain))
+
+        last_retryable_error: Optional[str] = None
+
+        for m_name in ordered_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m_name}:generateContent?key={key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "systemInstruction": {
+                    "parts": [{"text": _build_system_prompt()}]
                 },
-            },
-        }
+                "contents": [
+                    {
+                        "parts": [{"text": f"Learner goal:\n{goal_text}"}]
+                    }
+                ],
+                "generationConfig": {
+                    "responseMimeType": "application/json",
+                    "thinkingConfig": {
+                        "thinkingLevel": "low",
+                    },
+                },
+            }
 
-        with httpx.Client(timeout=15.0) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            if resp.status_code != 200:
-                raise GoalParsingError(f"Gemini API Error [{resp.status_code}]: {resp.text}", status_code=502)
-            data = resp.json()
+            try:
+                with httpx.Client(timeout=timeout_seconds) as client:
+                    resp = client.post(url, headers=headers, json=payload)
 
-        try:
-            candidates = data.get("candidates", [])
-            raw_content = candidates[0]["content"]["parts"][0]["text"]
-            return json.loads(raw_content)
-        except Exception as e:
-            raise GoalParsingError(f"Malformed LLM response from Gemini: {e}", status_code=502)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        last_retryable_error = f"Model {m_name} returned no candidates"
+                        continue
+
+                    raw_content = candidates[0]["content"]["parts"][0]["text"]
+                    try:
+                        return json.loads(raw_content)
+                    except json.JSONDecodeError as json_err:
+                        last_retryable_error = f"Model {m_name} returned malformed JSON: {json_err}"
+                        continue
+
+                elif is_retryable_gemini_error(resp.status_code, resp.text):
+                    last_retryable_error = f"Model {m_name} returned retryable status {resp.status_code}: {resp.text}"
+                    continue
+
+                else:
+                    # Non-retryable error (e.g. 400 Bad Request, malformed prompt structure)
+                    raise GoalParsingError(
+                        f"Gemini API Non-Retryable Error [{resp.status_code}]: {resp.text}",
+                        status_code=502,
+                    )
+
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError) as net_err:
+                last_retryable_error = f"Model {m_name} network/timeout error: {net_err}"
+                continue
+            except GoalParsingError:
+                raise
+            except Exception as e:
+                raise GoalParsingError(f"Unexpected error parsing goal with model {m_name}: {e}", status_code=500)
+
+        # All models exhausted
+        raise GoalParsingError(
+            f"Goal parsing service is temporarily unavailable across all configured models ({', '.join(ordered_models)}). Please try again later.",
+            status_code=503,
+        )
 
 
 # ---------------------------------------------------------------------------
