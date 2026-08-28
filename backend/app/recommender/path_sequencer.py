@@ -232,6 +232,20 @@ def calculate_skill_depths(
 # COURSE ROADMAP SEQUENCING
 # ---------------------------------------------------------------------------
 
+def _get_ancestor_prerequisites(skill: str, dag: Dict[str, List[str]]) -> Set[str]:
+    """Return all transitive upstream prerequisite skills for a given skill in the DAG."""
+    ancestors: Set[str] = set()
+    stack = list(dag.get(skill, []))
+    visited: Set[str] = set()
+    while stack:
+        curr = stack.pop()
+        ancestors.add(curr)
+        if curr not in visited:
+            visited.add(curr)
+            stack.extend(dag.get(curr, []))
+    return ancestors
+
+
 def _extract_course_skills(course: Any) -> Tuple[Optional[str], List[str]]:
     """Helper to extract primary_skill and covered_skills from various course representations."""
     if isinstance(course, dict):
@@ -336,28 +350,34 @@ def sequence_courses(
     course_ids = [item["course_id"] for item in course_items]
 
     # 2. Build course-to-course dependency graph
-    # Course A is a prerequisite of Course B (A -> B) if Course A teaches a skill
-    # that is an upstream prerequisite for any skill taught by Course B.
+    # Course A is a prerequisite of Course B (A -> B) if Course A's primary skill
+    # is an upstream prerequisite for Course B's primary skill according to the canonical DAG.
     in_degree: Dict[str, int] = {cid: 0 for cid in course_ids}
     dependents: Dict[str, List[str]] = {cid: [] for cid in course_ids}
     course_prereqs_map: Dict[str, Set[str]] = {cid: set() for cid in course_ids}
 
     for i, cid_b in enumerate(course_ids):
-        skills_b = course_skills_map[cid_b]
-        # Collect all direct prerequisites for skills in B
-        needed_prereqs: Set[str] = set()
-        for sb in skills_b:
-            for p in dag.get(sb, []):
-                if p not in known_set and p not in skills_b:
-                    needed_prereqs.add(p)
+        item_b = course_id_to_item[cid_b]
+        pri_b = item_b.get("primary_skill")
+        if not pri_b:
+            continue
 
-        # Find which courses teach these prerequisites
+        # Collect all transitive upstream prerequisites for Course B's primary skill
+        ancestors_b = _get_ancestor_prerequisites(pri_b, dag)
+        needed_prereqs: Set[str] = {
+            p for p in ancestors_b
+            if p not in known_set
+        }
+
+        # Find which courses teach these prerequisite competencies as their primary focus
         for cid_a in course_ids:
             if cid_a == cid_b:
                 continue
-            skills_a = course_skills_map[cid_a]
-            # If Course A teaches any skill needed by Course B
-            if not skills_a.isdisjoint(needed_prereqs):
+            item_a = course_id_to_item[cid_a]
+            pri_a = item_a.get("primary_skill")
+
+            # Course A is a prerequisite if its primary skill satisfies an unmastered upstream prerequisite of B
+            if pri_a and pri_a in needed_prereqs:
                 if cid_a not in course_prereqs_map[cid_b]:
                     course_prereqs_map[cid_b].add(cid_a)
                     in_degree[cid_b] += 1

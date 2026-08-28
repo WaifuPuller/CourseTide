@@ -201,3 +201,126 @@ def test_known_skills_satisfaction_reduces_depth():
     depths_with_known = calculate_skill_depths(skills, known_skills=["python", "stats"])
     assert depths_with_known["data_manip"] == 0  # Phase 1
     assert depths_with_known["ml_fund"] == 1  # Phase 2 (depends on data_manip)
+
+
+# ---------------------------------------------------------------------------
+# 8. PRODUCTION REGRESSION & MULTI-SKILL SECONDARY ISOLATION
+# ---------------------------------------------------------------------------
+
+def test_production_six_course_ml_engineer_set_sequences_without_cycle():
+    """Verify that the exact 6-course recommended set from the production smoke test sequences cleanly."""
+    courses = [
+        {
+            "id": "machine-learning-project-titanic-house-prices",
+            "title": "Machine Learning Project (Titanic/House Prices)",
+            "primary_skill": "ml_fund",
+            "covered_gap_skills": ["ml_fund", "data_manip"],
+            "difficulty": "intermediate",
+            "duration_hours": 10,
+        },
+        {
+            "id": "made-with-ml-mlops-course",
+            "title": "Made With ML - MLOps Course",
+            "primary_skill": "mlops",
+            "covered_gap_skills": ["mlops", "ml_fund"],
+            "difficulty": "intermediate",
+            "duration_hours": 20,
+        },
+        {
+            "id": "mlops-specialization",
+            "title": "MLOps Specialization",
+            "primary_skill": "mlops",
+            "covered_gap_skills": ["mlops", "deep_learning"],
+            "difficulty": "advanced",
+            "duration_hours": 35,
+        },
+        {
+            "id": "machine-learning-specialization",
+            "title": "Machine Learning Specialization",
+            "primary_skill": "ml_fund",
+            "covered_gap_skills": ["ml_fund", "data_manip"],
+            "difficulty": "intermediate",
+            "duration_hours": 40,
+        },
+        {
+            "id": "deep-learning-specialization",
+            "title": "Deep Learning Specialization",
+            "primary_skill": "deep_learning",
+            "covered_gap_skills": ["deep_learning", "neural_nets"],
+            "difficulty": "advanced",
+            "duration_hours": 60,
+        },
+        {
+            "id": "intro-to-deep-learning",
+            "title": "Intro to Deep Learning",
+            "primary_skill": "deep_learning",
+            "covered_gap_skills": ["deep_learning", "neural_nets"],
+            "difficulty": "intermediate",
+            "duration_hours": 6,
+        },
+    ]
+
+    known_skills = ["python", "stats"]
+
+    # 1. Must NOT raise CycleDetectedError
+    roadmap = sequence_courses(courses, known_skills=known_skills, weekly_hours=8)
+
+    # 2. All six courses represented
+    assert roadmap.total_courses == 6
+    all_course_ids = [c.course_id for p in roadmap.phases for c in p.courses]
+    assert len(all_course_ids) == 6
+    assert set(all_course_ids) == {c["id"] for c in courses}
+
+    # 3. Phased structure: Foundational (ml_fund) -> Deep Learning -> MLOps
+    phase_map = {c.course_id: c.phase_number for p in roadmap.phases for c in p.courses}
+    
+    # ML fundamentals courses must be in Phase 1
+    assert phase_map["machine-learning-project-titanic-house-prices"] == 1
+    assert phase_map["machine-learning-specialization"] == 1
+
+    # Deep learning courses must come after ML fundamentals
+    assert phase_map["deep-learning-specialization"] > phase_map["machine-learning-specialization"]
+    assert phase_map["intro-to-deep-learning"] > phase_map["machine-learning-specialization"]
+
+    # MLOps courses must come after Deep Learning
+    assert phase_map["made-with-ml-mlops-course"] > phase_map["deep-learning-specialization"]
+    assert phase_map["mlops-specialization"] > phase_map["deep-learning-specialization"]
+
+    # 4. Phase 1 courses must have status='available', later phases status='locked'
+    for p in roadmap.phases:
+        for c in p.courses:
+            if p.phase_number == 1:
+                assert c.status == "available"
+            else:
+                assert c.status == "locked"
+
+    # 5. Deterministic output
+    roadmap_repeat = sequence_courses(courses, known_skills=known_skills, weekly_hours=8)
+    repeat_ids = [c.course_id for p in roadmap_repeat.phases for c in p.courses]
+    assert all_course_ids == repeat_ids
+
+
+def test_secondary_skill_tag_does_not_create_reverse_dependency():
+    """Verify that an advanced course tagging a foundational secondary skill does not reverse prerequisites."""
+    courses = [
+        {
+            "id": "advanced-mlops",
+            "title": "Advanced Production MLOps",
+            "primary_skill": "mlops",  # Advanced depth 4
+            "covered_gap_skills": ["mlops", "data_manip"],  # data_manip is foundational depth 1
+        },
+        {
+            "id": "foundational-data",
+            "title": "Data Manipulation 101",
+            "primary_skill": "data_manip",  # Foundational depth 1
+            "covered_gap_skills": ["data_manip"],
+        },
+    ]
+
+    roadmap = sequence_courses(courses, known_skills=["python"], weekly_hours=10)
+
+    # Foundational course must be Phase 1, Advanced MLOps must be later
+    phase_map = {c.course_id: c.phase_number for p in roadmap.phases for c in p.courses}
+    assert phase_map["foundational-data"] == 1
+    assert phase_map["advanced-mlops"] > phase_map["foundational-data"]
+
