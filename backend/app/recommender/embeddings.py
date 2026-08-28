@@ -165,6 +165,9 @@ async def recommend_courses_async(
     Returns:
         Ranked list of RecommendedCourse objects.
     """
+    if not gap_skills:
+        return []
+
     model = embed_model or get_embed_model()
 
     # 1. Generate query embedding

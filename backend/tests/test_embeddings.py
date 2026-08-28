@@ -121,3 +121,69 @@ async def test_testing_mode_skips_embedding_model_download():
             async with lifespan(test_app):
                 assert test_app.state.embed_model is None
             mock_get_model.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_legitimate_no_gap_returns_empty_recommendations():
+    """Verify that a learner with 100% skill match (gap_skills == []) returns empty recommendations without using fallback vector."""
+    from unittest.mock import AsyncMock
+    from backend.app.recommender.skill_gap import detect_skill_gaps, TARGET_ROLES
+    from backend.app.recommender.embeddings import recommend_courses_async
+
+    # Select target role and supply all required skills
+    target_role = "ml_engineer"
+    all_required_skills = list(TARGET_ROLES[target_role]["required_skills"])
+
+    # 1. Skill gap engine produces gap_skills == []
+    gap_result = detect_skill_gaps(target_role=target_role, known_skills=all_required_skills)
+    assert gap_result.gap_skills == []
+    assert gap_result.match_percentage == 100.0
+
+    # 2. Mock database session to verify it is not even queried
+    mock_db = AsyncMock()
+
+    # 3. Call recommend_courses_async
+    recs = await recommend_courses_async(db=mock_db, gap_skills=gap_result.gap_skills)
+
+    # 4. Confirm explicit empty list behavior
+    assert recs == []
+    mock_db.execute.assert_not_called()
+
+
+def test_internal_pipeline_gap_query_embedding():
+    """Verify that real internal pipeline output (canonical gap skills -> build_gap_query_text -> PrecomputedSkillEmbedder) produces valid 384-d normalized vector."""
+    from backend.app.recommender.skill_gap import detect_skill_gaps
+    from backend.app.recommender.embeddings import (
+        build_gap_query_text,
+        PrecomputedSkillEmbedder,
+        SKILLS_MAP,
+    )
+
+    # 1. Simulate internal pipeline gap detection
+    # Learner knows Python and SQL, wants ML Engineer role
+    gap_result = detect_skill_gaps(target_role="ml_engineer", known_skills=["python", "sql"])
+    assert len(gap_result.gap_skills) > 0
+    assert "deep_learning" in gap_result.gap_skills
+
+    # 2. Build gap query text using internal function
+    query_text = build_gap_query_text(gap_result.gap_skills)
+    assert "Curated courses and practical projects covering:" in query_text
+    # Verify canonical human-readable names are included
+    for s_id in gap_result.gap_skills:
+        expected_name = SKILLS_MAP.get(s_id, s_id.replace("_", " ").title())
+        assert expected_name in query_text
+
+    # 3. Encode using PrecomputedSkillEmbedder
+    embedder = PrecomputedSkillEmbedder()
+    vecs = embedder.encode([query_text], normalize_embeddings=True)
+
+    # 4. Assert vector properties
+    assert vecs.shape == (1, 384)
+    norm = np.linalg.norm(vecs[0])
+    assert np.isclose(norm, 1.0, atol=1e-5)
+
+    # 5. Confirm it is a meaningful semantic vector, not the single-basis fallback vector [1, 0, 0, ...]
+    fallback_vector = np.zeros(384, dtype=np.float32)
+    fallback_vector[0] = 1.0
+    assert not np.allclose(vecs[0], fallback_vector)
+
