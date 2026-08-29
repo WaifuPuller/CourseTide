@@ -207,22 +207,22 @@ def test_profile_creation_db_commit_failure_raises_500():
     assert "recommended_courses" not in data
 
 
-def test_roadmap_skeleton():
-    """Verify GET /api/roadmap/{learner_id} endpoint."""
+def test_roadmap_unknown_learner_returns_404():
+    """Verify GET /api/roadmap/{learner_id} endpoint returns 404 for unknown learner."""
     test_id = str(uuid.uuid4())
     response = make_request("get", f"/api/roadmap/{test_id}")
-    assert response.status_code == 200
+    assert response.status_code == 404
     data = response.json()
-    assert data["learner_id"] == test_id
+    assert f"Learner with ID '{test_id}' not found." in data["detail"]
 
 
-def test_explain_skeleton():
-    """Verify GET /api/explain/{learner_id}/{course_id} endpoint."""
+def test_explain_unknown_learner_returns_404():
+    """Verify GET /api/explain/{learner_id}/{course_id} endpoint returns 404 for unknown learner."""
     test_id = str(uuid.uuid4())
     response = make_request("get", f"/api/explain/{test_id}/cs50-python")
-    assert response.status_code == 200
+    assert response.status_code == 404
     data = response.json()
-    assert data["course_id"] == "cs50-python"
+    assert f"Learner with ID '{test_id}' not found." in data["detail"]
 
 
 def test_progress_skeleton():
