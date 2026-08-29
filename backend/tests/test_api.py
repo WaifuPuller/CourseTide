@@ -238,10 +238,10 @@ def test_progress_unknown_learner_returns_404():
     assert f"Learner with ID '{test_id}' not found." in data["detail"]
 
 
-def test_dashboard_skeleton():
-    """Verify GET /api/dashboard/{learner_id} endpoint."""
+def test_dashboard_unknown_learner_returns_404():
+    """Verify GET /api/dashboard/{learner_id} returns 404 for nonexistent learner."""
     test_id = str(uuid.uuid4())
     response = make_request("get", f"/api/dashboard/{test_id}")
-    assert response.status_code == 200
+    assert response.status_code == 404
     data = response.json()
-    assert data["learner_id"] == test_id
+    assert f"Learner with ID '{test_id}' not found." in data["detail"]
