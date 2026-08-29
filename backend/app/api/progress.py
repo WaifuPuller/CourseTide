@@ -8,6 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.database import get_db
 from backend.app.models import Course, Learner, LearningPath, ProgressEvent
+from backend.app.recommender.adaptive import (
+    MasteryAdaptationResult,
+    evaluate_mastery_and_fast_track,
+)
 
 router = APIRouter(prefix="/api/progress", tags=["Progress"])
 
@@ -56,8 +60,8 @@ async def record_progress_event(
     """POST /api/progress
 
     Records a learner's progress event (assessment score and/or difficulty feedback),
-    updates course completion status (if numeric score provided), and triggers
-    phase unlocking when all courses in a milestone phase are completed.
+    updates course completion status (if numeric score provided), evaluates deterministic
+    mastery fast-track rules (> 85.0), and triggers phase unlocking.
     """
     try:
         # 1. Look up learner (lock learner row if supported)
@@ -87,7 +91,19 @@ async def record_progress_event(
                 detail=f"Course '{payload.course_id}' is not in the learner's active roadmap.",
             )
 
-        # 4. Insert ProgressEvent record (immutable historical audit log)
+        # 4. State Validation (Actionable Milestone Guard)
+        if target_lp.status == "locked":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Course '{payload.course_id}' is locked. Complete preceding phase milestones first.",
+            )
+        elif target_lp.status == "skipped":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Course '{payload.course_id}' was skipped due to demonstrated mastery.",
+            )
+
+        # 5. Insert ProgressEvent record (immutable historical audit log)
         event = ProgressEvent(
             learner_id=payload.learner_id,
             course_id=payload.course_id,
@@ -96,22 +112,47 @@ async def record_progress_event(
         )
         db.add(event)
 
-        # 5. Course Completion & Phase Unlock (Checkpoint 1 rules)
+        # 6. Course Completion & Adaptive Evaluation (Checkpoint 2)
+        prior_status = target_lp.status
+        adaptation_result = MasteryAdaptationResult(
+            mastery_triggered=False,
+            mastered_skill=None,
+            skipped_course_id=None,
+            adaptation_applied="none",
+            message="Progress event recorded successfully.",
+        )
+
         if payload.assessment_score is not None:
             # Mark the course as done
             target_lp.status = "done"
 
-            # Check if all courses in the current phase are satisfied ('done' or 'skipped')
-            current_phase_num = target_lp.phase_number
-            current_phase_courses = [lp for lp in learning_paths if lp.phase_number == current_phase_num]
-            phase_satisfied = all(lp.status in ("done", "skipped") for lp in current_phase_courses)
+            # Evaluate mastery (> 85.0) & fast-track skip rule ONLY on first-time completion
+            if prior_status != "done":
+                adaptation_result = await evaluate_mastery_and_fast_track(
+                    db=db,
+                    learner=learner,
+                    completed_lp=target_lp,
+                    assessment_score=payload.assessment_score,
+                    all_learning_paths=learning_paths,
+                )
+            else:
+                adaptation_result = MasteryAdaptationResult(
+                    mastery_triggered=False,
+                    mastered_skill=None,
+                    skipped_course_id=None,
+                    adaptation_applied="none",
+                    message="Progress event recorded for previously completed course.",
+                )
 
-            if phase_satisfied:
-                # Unlock immediate next phase (Phase N + 1)
-                next_phase_courses = [lp for lp in learning_paths if lp.phase_number == current_phase_num + 1]
-                for n_lp in next_phase_courses:
-                    if n_lp.status == "locked":
-                        n_lp.status = "available"
+            # Evaluate phase unlocks across all phases
+            distinct_phases = sorted(list({lp.phase_number for lp in learning_paths}))
+            for phase_num in distinct_phases:
+                phase_courses = [lp for lp in learning_paths if lp.phase_number == phase_num]
+                if all(lp.status in ("done", "skipped") for lp in phase_courses):
+                    next_phase_courses = [lp for lp in learning_paths if lp.phase_number == phase_num + 1]
+                    for n_lp in next_phase_courses:
+                        if n_lp.status == "locked":
+                            n_lp.status = "available"
 
         # 6. Commit atomic transaction
         await db.commit()
@@ -133,11 +174,11 @@ async def record_progress_event(
         course_id=payload.course_id,
         status="success",
         course_status=target_lp.status,
-        adaptation_applied="none",
+        adaptation_applied=adaptation_result.adaptation_applied,
         adaptation_details=AdaptationDetails(
-            message="Progress event recorded successfully.",
-            mastered_skill=None,
-            skipped_course_id=None,
+            message=adaptation_result.message,
+            mastered_skill=adaptation_result.mastered_skill,
+            skipped_course_id=adaptation_result.skipped_course_id,
             inserted_course_id=None,
         ),
     )
