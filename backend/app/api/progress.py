@@ -9,8 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.database import get_db
 from backend.app.models import Course, Learner, LearningPath, ProgressEvent
 from backend.app.recommender.adaptive import (
-    MasteryAdaptationResult,
+    AdaptationResult,
     evaluate_mastery_and_fast_track,
+    evaluate_remediation,
 )
 
 router = APIRouter(prefix="/api/progress", tags=["Progress"])
@@ -112,12 +113,9 @@ async def record_progress_event(
         )
         db.add(event)
 
-        # 6. Course Completion & Adaptive Evaluation (Checkpoint 2)
+        # 6. Course Completion & Adaptive Evaluation (Checkpoint 2 & 3)
         prior_status = target_lp.status
-        adaptation_result = MasteryAdaptationResult(
-            mastery_triggered=False,
-            mastered_skill=None,
-            skipped_course_id=None,
+        adaptation_result = AdaptationResult(
             adaptation_applied="none",
             message="Progress event recorded successfully.",
         )
@@ -126,20 +124,31 @@ async def record_progress_event(
             # Mark the course as done
             target_lp.status = "done"
 
-            # Evaluate mastery (> 85.0) & fast-track skip rule ONLY on first-time completion
+            # Evaluate adaptive rules ONLY on first-time completion
             if prior_status != "done":
-                adaptation_result = await evaluate_mastery_and_fast_track(
-                    db=db,
-                    learner=learner,
-                    completed_lp=target_lp,
-                    assessment_score=payload.assessment_score,
-                    all_learning_paths=learning_paths,
-                )
+                if payload.assessment_score > 85.0:
+                    adaptation_result = await evaluate_mastery_and_fast_track(
+                        db=db,
+                        learner=learner,
+                        completed_lp=target_lp,
+                        assessment_score=payload.assessment_score,
+                        all_learning_paths=learning_paths,
+                    )
+                elif payload.assessment_score < 50.0:
+                    adaptation_result = await evaluate_remediation(
+                        db=db,
+                        learner=learner,
+                        failed_lp=target_lp,
+                        assessment_score=payload.assessment_score,
+                        all_learning_paths=learning_paths,
+                    )
+                else:
+                    adaptation_result = AdaptationResult(
+                        adaptation_applied="none",
+                        message="Progress event recorded successfully.",
+                    )
             else:
-                adaptation_result = MasteryAdaptationResult(
-                    mastery_triggered=False,
-                    mastered_skill=None,
-                    skipped_course_id=None,
+                adaptation_result = AdaptationResult(
                     adaptation_applied="none",
                     message="Progress event recorded for previously completed course.",
                 )
@@ -179,6 +188,6 @@ async def record_progress_event(
             message=adaptation_result.message,
             mastered_skill=adaptation_result.mastered_skill,
             skipped_course_id=adaptation_result.skipped_course_id,
-            inserted_course_id=None,
+            inserted_course_id=adaptation_result.inserted_course_id,
         ),
     )
