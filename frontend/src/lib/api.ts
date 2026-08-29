@@ -75,7 +75,7 @@ export interface RoadmapCourse {
   covered_skills: string[];
   phase_number: number;
   sequence_order: number;
-  status: "available" | "locked" | "in_progress" | "done" | string;
+  status: "available" | "locked" | "in_progress" | "done" | "skipped" | string;
   match_score?: number;
 }
 
@@ -112,6 +112,72 @@ export interface ProgressEventInput {
   course_id: string;
   difficulty_feedback?: "too_easy" | "just_right" | "too_hard";
   assessment_score?: number;
+}
+
+export interface ProgressEventResponse {
+  event_id: string;
+  status: string;
+  adaptation: {
+    adaptation_applied: "none" | "fast_track" | "remediation" | string;
+    message: string;
+    mastered_skill?: string | null;
+    skipped_course_id?: string | null;
+    inserted_course_id?: string | null;
+  };
+}
+
+export interface NextRecommendedAction {
+  course_id: string;
+  title: string;
+  phase_number: number;
+  sequence_order: number;
+  status: "available" | "in_progress" | string;
+  duration_hours: number;
+  primary_skill: string;
+  url?: string;
+}
+
+export interface SkillMasteryRadarItem {
+  skill_id: string;
+  skill_name: string;
+  status: "known" | "in_progress" | "gap" | string;
+  mastery_score: number;
+  is_required: boolean;
+}
+
+export interface PhaseProgressItem {
+  phase_number: number;
+  phase_name: string;
+  total_courses: number;
+  completed_courses: number;
+  skipped_courses: number;
+  is_unlocked: boolean;
+  estimated_hours: number;
+}
+
+export interface RecentEventItem {
+  course_id: string;
+  course_title: string;
+  assessment_score?: number;
+  difficulty_feedback?: string;
+  timestamp: string;
+}
+
+export interface DashboardResponse {
+  learner_id: string;
+  target_role: string;
+  role_name: string;
+  overall_progress_percentage: number;
+  effective_progress_percentage: number;
+  total_courses: number;
+  completed_courses: number;
+  skipped_courses: number;
+  current_phase_number: number;
+  current_phase_name: string;
+  next_recommended_action?: NextRecommendedAction | null;
+  skill_mastery_radar: SkillMasteryRadarItem[];
+  phase_progress: PhaseProgressItem[];
+  recent_events: RecentEventItem[];
 }
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -163,12 +229,12 @@ export const api = {
 
   // Adaptive Progress (POST /api/progress)
   recordProgress: (data: ProgressEventInput) =>
-    request<any>("/api/progress", {
+    request<ProgressEventResponse>("/api/progress", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   // Dashboard (GET /api/dashboard/{learner_id})
   getDashboard: (learnerId: string) =>
-    request<any>(`/api/dashboard/${learnerId}`),
+    request<DashboardResponse>(`/api/dashboard/${learnerId}`),
 };

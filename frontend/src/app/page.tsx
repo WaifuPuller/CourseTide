@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Sparkles,
   CheckCircle2,
@@ -22,9 +22,18 @@ import {
   HelpCircle,
   X,
   Milestone,
+  Compass,
+  Award,
+  FastForward,
+  CheckCircle,
+  Activity,
+  BarChart3,
+  Sliders,
+  History,
 } from "lucide-react";
 import {
   api,
+  DashboardResponse,
   ExplanationResponse,
   ProfileResponse,
   RecommendedCourse,
@@ -47,12 +56,20 @@ export default function Home() {
   const [profileResult, setProfileResult] = useState<ProfileResponse | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Roadmap State (Day 3 Step 3)
+  // Roadmap State (Day 3)
   const [roadmapResult, setRoadmapResult] = useState<RoadmapResponse | null>(null);
   const [isLoadingRoadmap, setIsLoadingRoadmap] = useState(false);
   const [roadmapError, setRoadmapError] = useState<string | null>(null);
 
-  // Grounded Explainer Modal State (Day 3 Step 4 + Step 3)
+  // Dashboard State (Day 4 Checkpoint 5)
+  const [dashboardResult, setDashboardResult] = useState<DashboardResponse | null>(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+  // UI-Only Weekly Commitment Slider (Day 4 Section 8)
+  const [weeklyCommitmentHours, setWeeklyCommitmentHours] = useState(8);
+
+  // Grounded Explainer Modal State (Day 3)
   const [explanationModal, setExplanationModal] = useState<ExplanationModalState | null>(null);
 
   useEffect(() => {
@@ -60,6 +77,26 @@ export default function Home() {
       .then((data) => setHealthStatus(data))
       .catch(() => setHealthStatus(null));
   }, []);
+
+  // Synchronize initial weeklyCommitmentHours from the learner's ProfileResponse
+  useEffect(() => {
+    if (profileResult?.weekly_hours) {
+      setWeeklyCommitmentHours(profileResult.weekly_hours);
+    }
+  }, [profileResult]);
+
+  const loadDashboardData = async (learnerId: string) => {
+    setIsLoadingDashboard(true);
+    setDashboardError(null);
+    try {
+      const dbData = await api.getDashboard(learnerId);
+      setDashboardResult(dbData);
+    } catch (err: any) {
+      setDashboardError(err.message || "Failed to load learner progress dashboard.");
+    } finally {
+      setIsLoadingDashboard(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +106,8 @@ export default function Home() {
     setErrorMessage(null);
     setRoadmapResult(null);
     setRoadmapError(null);
+    setDashboardResult(null);
+    setDashboardError(null);
 
     try {
       // 1. Analyze Profile (POST /api/profile)
@@ -77,6 +116,7 @@ export default function Home() {
         weekly_hours: weeklyHours,
       });
       setProfileResult(res);
+      setWeeklyCommitmentHours(res.weekly_hours || weeklyHours || 8);
 
       // 2. Fetch Sequenced Roadmap (GET /api/roadmap/{learner_id})
       setIsLoadingRoadmap(true);
@@ -88,6 +128,9 @@ export default function Home() {
       } finally {
         setIsLoadingRoadmap(false);
       }
+
+      // 3. Fetch Initial Dashboard Analytics (GET /api/dashboard/{learner_id})
+      await loadDashboardData(res.learner_id);
     } catch (err: any) {
       setErrorMessage(err.message || "Failed to analyze learning goal. Please check server connection.");
     } finally {
@@ -99,6 +142,8 @@ export default function Home() {
     setProfileResult(null);
     setRoadmapResult(null);
     setRoadmapError(null);
+    setDashboardResult(null);
+    setDashboardError(null);
     setErrorMessage(null);
     setExplanationModal(null);
     setGoal("");
@@ -135,6 +180,19 @@ export default function Home() {
       });
     }
   };
+
+  // Dynamic weekly pace calculations (UI-only)
+  const totalRoadmapHours = useMemo(() => {
+    if (dashboardResult) {
+      return dashboardResult.phase_progress.reduce((acc, p) => acc + p.estimated_hours, 0);
+    }
+    return roadmapResult?.total_estimated_hours || 0;
+  }, [dashboardResult, roadmapResult]);
+
+  const dynamicTotalWeeks = useMemo(() => {
+    if (weeklyCommitmentHours <= 0 || totalRoadmapHours <= 0) return 0;
+    return Math.ceil(totalRoadmapHours / weeklyCommitmentHours);
+  }, [totalRoadmapHours, weeklyCommitmentHours]);
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 pb-12">
@@ -255,19 +313,31 @@ export default function Home() {
         </div>
       )}
 
-      {/* Results View: Profile Analysis + Skill Gaps + Roadmap Timeline + Recommendations */}
+      {/* Results View: Profile Analysis + Dashboard + Phased Roadmap */}
       {profileResult && (
         <div className="space-y-10 animate-in fade-in duration-300">
           {/* Top Bar with Reset Action */}
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-slate-100">Learner Profile & Roadmap</h2>
-            <button
-              onClick={handleReset}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Analyze Another Goal</span>
-            </button>
+            <h2 className="text-2xl font-bold text-slate-100">Learner Profile & Dashboard</h2>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => loadDashboardData(profileResult.learner_id)}
+                disabled={isLoadingDashboard}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+                title="Refresh dashboard analytics"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDashboard ? "animate-spin text-teal-400" : ""}`} />
+                <span>Refresh Data</span>
+              </button>
+              <button
+                onClick={handleReset}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Analyze Another Goal</span>
+              </button>
+            </div>
           </div>
 
           {/* Unrecognized Skills Warning Banner */}
@@ -315,83 +385,423 @@ export default function Home() {
             </div>
 
             <div className="space-y-1">
-              <span className="text-xs text-slate-400 font-medium">Weekly Study Commitment</span>
+              <span className="text-xs text-slate-400 font-medium">Base Weekly Commitment</span>
               <p className="text-lg font-bold text-slate-100 flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-cyan-400" />
                 {profileResult.weekly_hours} hrs/week
               </p>
-              <span className="text-xs text-slate-500">Self-paced schedule</span>
+              <span className="text-xs text-slate-500">Intake preference</span>
             </div>
 
             <div className="space-y-1">
-              <span className="text-xs text-slate-400 font-medium">Estimated Timeframe</span>
+              <span className="text-xs text-slate-400 font-medium">Estimated Pace Timeline</span>
               <p className="text-lg font-bold text-slate-100 flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-cyan-400" />
-                {roadmapResult?.total_estimated_weeks
-                  ? `${roadmapResult.total_estimated_weeks} Weeks`
-                  : `${profileResult.timeframe_months} Months`}
+                {dynamicTotalWeeks > 0 ? `${dynamicTotalWeeks} Weeks` : `${profileResult.timeframe_months} Months`}
               </p>
               <span className="text-xs text-slate-500">
-                {roadmapResult ? "Calculated from sequenced roadmap" : "Target completion"}
+                @ {weeklyCommitmentHours} hrs/week active slider
               </span>
             </div>
           </div>
 
-          {/* Skill Breakdown: Known vs Gaps */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Known Skills */}
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-emerald-400 text-sm font-semibold">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Known Skills ({profileResult.known_skills.length})</span>
-                </div>
-                <span className="text-xs text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                  Mastered
-                </span>
+          {/* ========================================================================= */}
+          {/* DAY 4 CHECKPOINT 5: LEARNER DASHBOARD SECTION                             */}
+          {/* ========================================================================= */}
+          <div className="space-y-6 pt-4 border-t border-slate-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-teal-400" />
+                <h3 className="text-xl font-bold text-slate-100">Adaptive Progress Dashboard</h3>
               </div>
-              {profileResult.known_skills.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {profileResult.known_skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono"
-                    >
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500 italic">No previous experience detected. Complete novice onboarding.</p>
+              {dashboardResult && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-500/10 text-teal-300 border border-teal-500/20">
+                  Current Milestone: {dashboardResult.current_phase_name}
+                </span>
               )}
             </div>
 
-            {/* Skill Gaps */}
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-xl p-5 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-amber-400 text-sm font-semibold">
-                  <TrendingUp className="w-4 h-4" />
-                  <span>Target Skill Gaps ({profileResult.gap_skills.length})</span>
-                </div>
-                <span className="text-xs text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full">
-                  To Learn
-                </span>
+            {/* Dashboard Loading State */}
+            {isLoadingDashboard && (
+              <div className="p-8 rounded-2xl bg-slate-900/40 border border-slate-800 flex flex-col items-center justify-center space-y-3 text-center">
+                <RefreshCw className="w-6 h-6 animate-spin text-teal-400" />
+                <p className="text-sm font-medium text-slate-300">
+                  Aggregating learner progress and skill mastery radar...
+                </p>
               </div>
-              {profileResult.gap_skills.length > 0 ? (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {profileResult.gap_skills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+            )}
+
+            {/* Dashboard Error State */}
+            {dashboardError && (
+              <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-rose-200">Dashboard Unavailable</p>
+                  <p className="text-xs text-rose-300/90 mt-1">{dashboardError}</p>
                 </div>
-              ) : (
-                <p className="text-xs text-emerald-400 font-medium">All role requirements already satisfied!</p>
-              )}
-            </div>
+              </div>
+            )}
+
+            {dashboardResult && (
+              <div className="space-y-6">
+                {/* 1. Progress Overview & Metric Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Genuine Progress Card */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-medium flex items-center gap-1.5 text-emerald-400">
+                        <CheckCircle className="w-4 h-4" />
+                        Genuine Completion
+                      </span>
+                      <span className="font-mono bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded">
+                        {dashboardResult.completed_courses} / {dashboardResult.total_courses} done
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-3xl font-black text-slate-100">
+                        {dashboardResult.overall_progress_percentage}%
+                      </p>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${dashboardResult.overall_progress_percentage}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Courses successfully assessed and completed by learner.
+                    </p>
+                  </div>
+
+                  {/* Effective Progress Card */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span className="font-medium flex items-center gap-1.5 text-cyan-400">
+                        <FastForward className="w-4 h-4" />
+                        Effective Pacing
+                      </span>
+                      <span className="font-mono bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded">
+                        {dashboardResult.completed_courses + dashboardResult.skipped_courses} / {dashboardResult.total_courses}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-3xl font-black text-slate-100">
+                        {dashboardResult.effective_progress_percentage}%
+                      </p>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-gradient-to-r from-cyan-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${dashboardResult.effective_progress_percentage}%` }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Milestone pacing including {dashboardResult.skipped_courses} fast-tracked course(s).
+                    </p>
+                  </div>
+
+                  {/* Fast-Track Count Card */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 text-amber-400">
+                        <Award className="w-4 h-4" />
+                        Adaptive Fast-Tracks
+                      </span>
+                      <p className="text-2xl font-bold text-slate-100">
+                        {dashboardResult.skipped_courses}{" "}
+                        <span className="text-sm font-normal text-slate-400">Skipped</span>
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Bypassed downstream redundant courses via deterministic &gt;85% mastery assessments.
+                    </p>
+                  </div>
+
+                  {/* Active Phase Milestone Card */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1">
+                      <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5 text-teal-400">
+                        <Milestone className="w-4 h-4" />
+                        Active Phase
+                      </span>
+                      <p className="text-2xl font-bold text-teal-400">
+                        {dashboardResult.current_phase_name}
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Current sequential milestone in prerequisite progression.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Interactive Weekly Commitment Slider (UI-Only) */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 shadow-xl backdrop-blur space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-teal-400" />
+                      <h4 className="text-sm font-bold text-slate-200">Interactive Weekly Commitment Slider</h4>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      Current Pace: <strong className="text-teal-400 font-bold">{weeklyCommitmentHours} hrs/week</strong>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <input
+                      id="dashboard-hours"
+                      type="range"
+                      min={2}
+                      max={40}
+                      step={1}
+                      value={weeklyCommitmentHours}
+                      onChange={(e) => setWeeklyCommitmentHours(Number(e.target.value))}
+                      className="w-full h-2.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-500"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500">
+                      <span>2 hrs/wk (Casual)</span>
+                      <span>10 hrs/wk (Standard)</span>
+                      <span>20 hrs/wk (Part-time)</span>
+                      <span>40 hrs/wk (Full-time)</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                    <div className="text-slate-400">
+                      Total Estimated Curriculum: <strong className="text-slate-200">{totalRoadmapHours} hours</strong> across {dashboardResult.total_courses} courses
+                    </div>
+                    <div className="flex items-center gap-2 text-teal-300 font-semibold bg-teal-500/10 px-3 py-1 rounded-lg border border-teal-500/20">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Adjusted Roadmap Completion: ~{dynamicTotalWeeks} Weeks</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Next Recommended Action Hero Banner */}
+                <div className="bg-gradient-to-r from-teal-950/40 via-slate-900/60 to-slate-900/40 border border-teal-500/30 rounded-2xl p-6 shadow-xl backdrop-blur space-y-4">
+                  <div className="flex items-center gap-2 text-teal-400 text-xs font-bold uppercase tracking-wider">
+                    <Compass className="w-4 h-4" />
+                    Next Recommended Action
+                  </div>
+
+                  {dashboardResult.next_recommended_action ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-teal-300 bg-teal-500/20 px-2 py-0.5 rounded text-xs font-bold">
+                            Phase {dashboardResult.next_recommended_action.phase_number} • Course #{dashboardResult.next_recommended_action.sequence_order}
+                          </span>
+                          <span className="capitalize text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                            {dashboardResult.next_recommended_action.status}
+                          </span>
+                        </div>
+                        <h4 className="text-lg font-bold text-slate-100">
+                          {dashboardResult.next_recommended_action.title}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                          <span>Primary Skill: <strong className="text-teal-400">{dashboardResult.next_recommended_action.primary_skill}</strong></span>
+                          <span>•</span>
+                          <span>Duration: {dashboardResult.next_recommended_action.duration_hours} hrs</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleWhyThis(dashboardResult.next_recommended_action!.course_id, dashboardResult.next_recommended_action!.title)}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold transition-colors border border-slate-700"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Why this?</span>
+                        </button>
+                        {dashboardResult.next_recommended_action.url && (
+                          <a
+                            href={dashboardResult.next_recommended_action.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-teal-500/20"
+                          >
+                            <span>Start Course</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-1">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto" />
+                      <p className="text-sm font-semibold text-slate-200">You&apos;re caught up!</p>
+                      <p className="text-xs text-slate-400">
+                        No actionable course is currently available. All milestone prerequisites are satisfied or completed.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Skill Mastery Radar / Competency Grid */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-teal-400" />
+                      <h4 className="text-base font-bold text-slate-100">Skill Mastery Radar</h4>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      Authoritative Competency Evaluation
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {dashboardResult.skill_mastery_radar.map((skill) => (
+                      <div
+                        key={skill.skill_id}
+                        className="bg-slate-900/50 border border-slate-800/90 rounded-xl p-4 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-mono font-bold text-slate-200 truncate">
+                            {skill.skill_name}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                              skill.status === "known"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                : skill.status === "in_progress"
+                                ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30"
+                                : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                            }`}
+                          >
+                            {skill.status}
+                          </span>
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[11px] text-slate-400">
+                            <span>Mastery Score</span>
+                            <span className="font-mono text-slate-200 font-bold">{skill.mastery_score.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${
+                                skill.status === "known"
+                                  ? "bg-emerald-500"
+                                  : skill.status === "in_progress"
+                                  ? "bg-cyan-500"
+                                  : "bg-amber-500"
+                              }`}
+                              style={{ width: `${Math.min(100, Math.max(0, skill.mastery_score))}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 5. Phase Milestone Progress Breakdown */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Milestone className="w-4 h-4 text-teal-400" />
+                      <h4 className="text-base font-bold text-slate-100">Phase Milestone Progress</h4>
+                    </div>
+                    <span className="text-xs text-slate-400">
+                      Calculated using active {weeklyCommitmentHours} hrs/week commitment
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {dashboardResult.phase_progress.map((phase) => {
+                      const phaseWeeks = Math.ceil(phase.estimated_hours / (weeklyCommitmentHours || 8));
+                      const isComplete = phase.completed_courses + phase.skipped_courses >= phase.total_courses && phase.total_courses > 0;
+                      return (
+                        <div
+                          key={phase.phase_number}
+                          className={`rounded-xl p-4 space-y-3 border transition-all ${
+                            phase.is_unlocked
+                              ? "bg-slate-900/70 border-slate-800 shadow-sm"
+                              : "bg-slate-950/60 border-slate-800/60 opacity-70"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <h5 className="text-sm font-bold text-slate-100">{phase.phase_name}</h5>
+                            <span
+                              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 ${
+                                isComplete
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                  : phase.is_unlocked
+                                  ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30"
+                                  : "bg-slate-800 text-slate-400 border border-slate-700"
+                              }`}
+                            >
+                              {isComplete ? "Completed" : phase.is_unlocked ? "Unlocked" : "Locked"}
+                            </span>
+                          </div>
+
+                          <div className="text-xs text-slate-400 space-y-1">
+                            <div className="flex justify-between">
+                              <span>Progress:</span>
+                              <span className="font-mono text-slate-200">
+                                {phase.completed_courses} done, {phase.skipped_courses} skipped ({phase.total_courses} total)
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Workload:</span>
+                              <span className="font-mono text-slate-200">
+                                {phase.estimated_hours} hrs (~{phaseWeeks} wks)
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 6. Recent Progress Events History */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <History className="w-4 h-4 text-teal-400" />
+                      <h4 className="text-base font-bold text-slate-100">Recent Progress & Assessment Events</h4>
+                    </div>
+                  </div>
+
+                  {dashboardResult.recent_events.length > 0 ? (
+                    <div className="bg-slate-900/40 border border-slate-800 rounded-xl divide-y divide-slate-800/60 overflow-hidden">
+                      {dashboardResult.recent_events.map((evt, idx) => (
+                        <div key={idx} className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                          <div className="space-y-0.5">
+                            <p className="font-semibold text-slate-200">{evt.course_title}</p>
+                            <p className="text-[11px] text-slate-500">{new Date(evt.timestamp).toLocaleString()}</p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {evt.assessment_score !== null && evt.assessment_score !== undefined && (
+                              <span className={`px-2 py-0.5 rounded font-mono font-bold ${
+                                evt.assessment_score > 85
+                                  ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+                                  : evt.assessment_score < 50
+                                  ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                                  : "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20"
+                              }`}>
+                                Score: {evt.assessment_score.toFixed(1)}%
+                              </span>
+                            )}
+                            {evt.difficulty_feedback && (
+                              <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 capitalize">
+                                Feedback: {evt.difficulty_feedback.replace("_", " ")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl bg-slate-900/40 border border-slate-800/80 text-center text-xs text-slate-500">
+                      No progress events recorded yet. Complete course assessments to see adaptive updates here.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ROADMAP TIMELINE SECTION (Day 3 Step 3) */}
@@ -413,7 +823,7 @@ export default function Home() {
                     Total: <strong className="text-slate-200">{roadmapResult.total_courses} courses</strong> ({roadmapResult.total_estimated_hours} hrs)
                   </span>
                   <span className="text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-full border border-teal-500/20 font-semibold">
-                    ~{roadmapResult.total_estimated_weeks} Weeks @ {profileResult.weekly_hours}h/wk
+                    ~{dynamicTotalWeeks > 0 ? dynamicTotalWeeks : roadmapResult.total_estimated_weeks} Weeks @ {weeklyCommitmentHours}h/wk
                   </span>
                 </div>
               )}
@@ -506,7 +916,7 @@ export default function Home() {
 
                       <div className="text-xs text-slate-400 sm:text-right shrink-0">
                         <span className="block font-semibold text-slate-200">{phase.courses.length} Courses</span>
-                        <span>~{phase.estimated_hours} Hours</span>
+                        <span>~{phase.estimated_hours} Hours (~{Math.ceil(phase.estimated_hours / (weeklyCommitmentHours || 8))} Wks)</span>
                       </div>
                     </div>
 
@@ -518,6 +928,10 @@ export default function Home() {
                           className={`rounded-xl p-4 flex flex-col justify-between space-y-3 transition-all border ${
                             course.status === "available"
                               ? "bg-slate-900/70 border-slate-800 hover:border-teal-500/40 shadow-sm"
+                              : course.status === "done"
+                              ? "bg-emerald-950/20 border-emerald-500/30"
+                              : course.status === "skipped"
+                              ? "bg-slate-900/40 border-slate-800/40 opacity-60"
                               : "bg-slate-950/60 border-slate-800/60 opacity-80"
                           }`}
                         >
