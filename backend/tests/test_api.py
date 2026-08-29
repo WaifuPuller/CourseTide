@@ -225,17 +225,17 @@ def test_explain_unknown_learner_returns_404():
     assert f"Learner with ID '{test_id}' not found." in data["detail"]
 
 
-def test_progress_skeleton():
-    """Verify POST /api/progress endpoint."""
+def test_progress_unknown_learner_returns_404():
+    """Verify POST /api/progress endpoint returns 404 for unknown learner."""
     test_id = str(uuid.uuid4())
     response = make_request(
         "post",
         "/api/progress",
         json={"learner_id": test_id, "course_id": "cs50-python", "assessment_score": 88.0},
     )
-    assert response.status_code == 200
+    assert response.status_code == 404
     data = response.json()
-    assert data["assessment_score"] == 88.0
+    assert f"Learner with ID '{test_id}' not found." in data["detail"]
 
 
 def test_dashboard_skeleton():
