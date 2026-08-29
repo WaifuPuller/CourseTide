@@ -114,16 +114,21 @@ export interface ProgressEventInput {
   assessment_score?: number;
 }
 
+export interface AdaptationDetails {
+  message: string;
+  mastered_skill?: string | null;
+  skipped_course_id?: string | null;
+  inserted_course_id?: string | null;
+}
+
 export interface ProgressEventResponse {
   event_id: string;
+  learner_id: string;
+  course_id: string;
   status: string;
-  adaptation: {
-    adaptation_applied: "none" | "fast_track" | "remediation" | string;
-    message: string;
-    mastered_skill?: string | null;
-    skipped_course_id?: string | null;
-    inserted_course_id?: string | null;
-  };
+  course_status: string;
+  adaptation_applied: "none" | "mastery" | "mastery_skip" | "remediation" | string;
+  adaptation_details: AdaptationDetails;
 }
 
 export interface NextRecommendedAction {
