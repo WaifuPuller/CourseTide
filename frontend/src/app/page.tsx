@@ -36,6 +36,7 @@ import {
   DashboardResponse,
   ExplanationResponse,
   ProfileResponse,
+  ProgressEventInput,
   RecommendedCourse,
   RoadmapResponse,
 } from "@/lib/api";
@@ -46,6 +47,12 @@ interface ExplanationModalState {
   data?: ExplanationResponse;
   error?: string;
   loading: boolean;
+}
+
+interface AssessmentModalState {
+  courseId: string;
+  courseTitle: string;
+  isOpen: boolean;
 }
 
 export default function Home() {
@@ -71,6 +78,14 @@ export default function Home() {
 
   // Grounded Explainer Modal State (Day 3)
   const [explanationModal, setExplanationModal] = useState<ExplanationModalState | null>(null);
+
+  // Lightweight Assessment / Progress Modal State (Day 5 Checkpoint 1)
+  const [assessmentModal, setAssessmentModal] = useState<AssessmentModalState | null>(null);
+  const [assessmentScore, setAssessmentScore] = useState<string>("90");
+  const [difficultyFeedback, setDifficultyFeedback] = useState<"too_easy" | "just_right" | "too_hard" | "">("");
+  const [isSubmittingProgress, setIsSubmittingProgress] = useState(false);
+  const [progressModalError, setProgressModalError] = useState<string | null>(null);
+  const [progressSuccessMessage, setProgressSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     api.getHealth()
@@ -146,7 +161,82 @@ export default function Home() {
     setDashboardError(null);
     setErrorMessage(null);
     setExplanationModal(null);
+    setAssessmentModal(null);
     setGoal("");
+  };
+
+  const handleOpenAssessmentModal = (courseId: string, courseTitle: string) => {
+    setAssessmentModal({
+      courseId,
+      courseTitle,
+      isOpen: true,
+    });
+    setAssessmentScore("90");
+    setDifficultyFeedback("just_right");
+    setProgressModalError(null);
+    setProgressSuccessMessage(null);
+  };
+
+  const handleCloseAssessmentModal = () => {
+    if (isSubmittingProgress) return;
+    setAssessmentModal(null);
+    setProgressModalError(null);
+    setProgressSuccessMessage(null);
+  };
+
+  const handleSubmitProgress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileResult || !assessmentModal) return;
+
+    const scoreNum = parseFloat(assessmentScore);
+    if (isNaN(scoreNum) || scoreNum < 0 || scoreNum > 100) {
+      setProgressModalError("Please enter a valid assessment score between 0 and 100.");
+      return;
+    }
+
+    setIsSubmittingProgress(true);
+    setProgressModalError(null);
+    setProgressSuccessMessage(null);
+
+    try {
+      const payload: ProgressEventInput = {
+        learner_id: profileResult.learner_id,
+        course_id: assessmentModal.courseId,
+        assessment_score: scoreNum,
+        difficulty_feedback: difficultyFeedback ? (difficultyFeedback as "too_easy" | "just_right" | "too_hard") : undefined,
+      };
+
+      const res = await api.recordProgress(payload);
+
+      // Refresh server state (Roadmap & Dashboard)
+      const [updatedRoadmap, updatedDashboard] = await Promise.all([
+        api.getRoadmap(profileResult.learner_id),
+        api.getDashboard(profileResult.learner_id),
+      ]);
+
+      setRoadmapResult(updatedRoadmap);
+      setDashboardResult(updatedDashboard);
+
+      let feedbackMsg = res.adaptation_details?.message || "Progress recorded successfully.";
+      if (res.adaptation_applied === "mastery_skip" && res.adaptation_details?.skipped_course_id) {
+        feedbackMsg = `High score (${scoreNum.toFixed(1)}%) demonstrated mastery! Course completed and redundant downstream course was fast-tracked.`;
+      } else if (res.adaptation_applied === "mastery") {
+        feedbackMsg = `High score (${scoreNum.toFixed(1)}%) demonstrated mastery! Competency marked known.`;
+      } else if (res.adaptation_applied === "remediation" && res.adaptation_details?.inserted_course_id) {
+        feedbackMsg = `Score (${scoreNum.toFixed(1)}%) indicated need for reinforcement. Remedial course inserted into roadmap.`;
+      }
+
+      setProgressSuccessMessage(feedbackMsg);
+
+      setTimeout(() => {
+        setAssessmentModal(null);
+        setIsSubmittingProgress(false);
+        setProgressSuccessMessage(null);
+      }, 1600);
+    } catch (err: any) {
+      setProgressModalError(err.message || "Failed to record progress event. Please try again.");
+      setIsSubmittingProgress(false);
+    }
   };
 
   const handleWhyThis = async (courseId: string, courseTitle: string) => {
@@ -604,7 +694,7 @@ export default function Home() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
                         <button
                           type="button"
                           onClick={() => handleWhyThis(dashboardResult.next_recommended_action!.course_id, dashboardResult.next_recommended_action!.title)}
@@ -613,14 +703,22 @@ export default function Home() {
                           <Sparkles className="w-3.5 h-3.5" />
                           <span>Why this?</span>
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAssessmentModal(dashboardResult.next_recommended_action!.course_id, dashboardResult.next_recommended_action!.title)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-teal-500/20"
+                        >
+                          <Award className="w-3.5 h-3.5" />
+                          <span>Submit Assessment</span>
+                        </button>
                         {dashboardResult.next_recommended_action.url && (
                           <a
                             href={dashboardResult.next_recommended_action.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-teal-500/20"
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors border border-slate-700"
                           >
-                            <span>Start Course</span>
+                            <span>Open</span>
                             <ExternalLink className="w-3.5 h-3.5" />
                           </a>
                         )}
@@ -972,7 +1070,7 @@ export default function Home() {
                               ))}
                             </div>
 
-                            <div className="flex items-center justify-between pt-1">
+                            <div className="flex items-center justify-between pt-1 gap-2">
                               <button
                                 type="button"
                                 onClick={() => handleWhyThis(course.course_id, course.title)}
@@ -982,17 +1080,31 @@ export default function Home() {
                                 <span>Why this?</span>
                               </button>
 
-                              {course.url && (
-                                <a
-                                  href={course.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-slate-500 hover:text-slate-300 transition-colors"
-                                  title="Open Course Resource"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {(course.status === "available" || course.status === "in_progress") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAssessmentModal(course.course_id, course.title)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 text-[11px] font-semibold transition-colors border border-teal-500/30"
+                                    title="Submit assessment score to adapt roadmap"
+                                  >
+                                    <Award className="w-3 h-3 text-teal-400" />
+                                    <span>Assess</span>
+                                  </button>
+                                )}
+
+                                {course.url && (
+                                  <a
+                                    href={course.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-slate-500 hover:text-slate-300 transition-colors"
+                                    title="Open Course Resource"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1170,6 +1282,122 @@ export default function Home() {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightweight Assessment / Progress Submission Modal (Day 5 Checkpoint 1) */}
+      {assessmentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 relative">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-[11px] font-bold uppercase tracking-wider">
+                  <Award className="w-3 h-3" />
+                  Course Assessment & Progress
+                </div>
+                <h4 className="text-lg font-bold text-slate-100 line-clamp-1">
+                  {assessmentModal.courseTitle}
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseAssessmentModal}
+                disabled={isSubmittingProgress}
+                className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {progressSuccessMessage ? (
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-sm space-y-2 text-center py-6">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                <p className="font-bold text-emerald-200">Progress Recorded!</p>
+                <p className="text-xs text-emerald-300/90 leading-relaxed">{progressSuccessMessage}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitProgress} className="space-y-4">
+                {progressModalError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                    <span>{progressModalError}</span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label htmlFor="assessment-score-input" className="block text-xs font-semibold text-slate-200">
+                    Assessment Score (0 – 100%)
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="assessment-score-input"
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      required
+                      value={assessmentScore}
+                      onChange={(e) => setAssessmentScore(e.target.value)}
+                      disabled={isSubmittingProgress}
+                      className="w-full rounded-xl bg-slate-950 border border-slate-800 px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 text-sm font-mono"
+                      placeholder="e.g. 92.5"
+                    />
+                    <span className="absolute right-4 top-2.5 text-xs text-slate-500 font-mono">%</span>
+                  </div>
+                  <div className="flex justify-between text-[11px] text-slate-500">
+                    <span className="text-rose-400/80">&lt;50% triggers remediation</span>
+                    <span className="text-emerald-400/80">&gt;85% triggers mastery</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="difficulty-feedback-select" className="block text-xs font-semibold text-slate-200">
+                    Difficulty Feedback (Optional)
+                  </label>
+                  <select
+                    id="difficulty-feedback-select"
+                    value={difficultyFeedback}
+                    onChange={(e) => setDifficultyFeedback(e.target.value as any)}
+                    disabled={isSubmittingProgress}
+                    className="w-full rounded-xl bg-slate-950 border border-slate-800 px-3 py-2.5 text-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+                  >
+                    <option value="">No feedback</option>
+                    <option value="too_easy">Too Easy (Paced below current skill)</option>
+                    <option value="just_right">Just Right (Appropriate challenge)</option>
+                    <option value="too_hard">Too Hard (Prerequisites felt weak)</option>
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseAssessmentModal}
+                    disabled={isSubmittingProgress}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingProgress}
+                    className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-teal-500/20 disabled:opacity-50"
+                  >
+                    {isSubmittingProgress ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Recording...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        <span>Submit Score</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
